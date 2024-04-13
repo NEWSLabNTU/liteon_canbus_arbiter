@@ -118,11 +118,8 @@ class CanbusArbiter(Node):
             can_callback_period_secs, self.can_callback
         )
 
-
     def step(self) -> None:
-        # self.get_logger().info('{}'.format(self.state))
-        # simple on-off gear controller
-
+        # for simulation debugging
         if self.get_parameter('control').get_parameter_value().string_value == "simulate":
             state_value_map = dict()
             state_value_map['speed'] = self.state.target_speed
@@ -137,38 +134,36 @@ class CanbusArbiter(Node):
         # simple on-off mode controller
         if self.state.current_mode != self.state.target_mode:
             # Note: Brake and gear changes must be done manually; only EPS and throttle can be changed via CAN message.
-            if self.ch is None:
-                return
+            if self.ch is not None:
+                if self.state.target_mode == GateMode.EXTERNAL:
+                    self.state.current_mode = GateMode.EXTERNAL
+                    send_angle_cmd(self.ch, self.state.current_steering_angle, 0) # disable EPS
+                    send_velocity_cmd(self.ch, self.state.current_throttle, 0)    # disable throttle
+                    send_brake_cmd(self.ch, 0)
+                else:
+                    self.state.current_mode = GateMode.AUTO
+                    send_angle_cmd(self.ch, self.state.current_steering_angle, 1) # enable EPS
+                    send_velocity_cmd(self.ch, self.state.current_throttle, 1)    # enable throttle
+                    send_brake_cmd(self.ch, 0)
 
-            if self.state.target_mode == GateMode.EXTERNAL:
-                self.state.current_mode = GateMode.EXTERNAL
-                send_angle_cmd(self.ch, self.state.current_steering_angle, 1)
-                send_velocity_cmd(self.ch, self.state.current_throttle, 1)
-                send_brake_cmd(self.ch, 0)
-            else:
-                self.state.current_mode = GateMode.AUTO
-                send_angle_cmd(self.ch, self.state.current_steering_angle, 0)
-                send_velocity_cmd(self.ch, self.state.current_throttle, 0)
-                send_brake_cmd(self.ch, 0)
+        # Only AUTO mode starts AUTONOMOUS Driving
+        if self.state.current_mode == GateMode.EXTERNAL:
+            self.get_logger().info("Currently in EXTERNAL mode")
+            return
 
         if abs_equal(self.state.target_speed, 0.0) and not abs_equal(self.state.previous_speed, 0.0):
             #print("target speed: ", self.state.target_speed)
             #print("previous speed: ", self.state.previous_speed)
-            if self.ch is None:
-                return
+            if self.ch is not None:
+                send_brake_cmd(self.ch, 15)
 
-            send_brake_cmd(self.ch, 15)
             return
 
         # P steering angle controller
         if self.state.current_gear == Gear.DRIVE.value or \
             self.state.current_gear == Gear.REVERSE.value:
-            # steering_angle = self.steering_controller(self.state.current_steering_angle)
             if self.ch is None:
-                return
-            #print("Send angle command")
-            send_angle_cmd(self.ch, self.state.target_steering_angle, 1)
-            # self.state.current_steering_angle += steering_angle # for offline debuging
+                send_angle_cmd(self.ch, self.state.target_steering_angle, 1)
 
         if self.state.current_gear != self.state.target_gear and \
                 abs_equal(self.state.current_speed, 0.0):
@@ -176,10 +171,9 @@ class CanbusArbiter(Node):
             if gear is None:
                 self.get_logger().warning("change gear failed: invalid gear")
             else:
-                if self.ch is None:
-                    return
-                send_gear_cmd(self.ch, gear)
-                #self.state.current_gear = self.gearchar_2_val(gear) # for offline debuging
+                if self.ch is not None:
+                    send_gear_cmd(self.ch, gear)
+            return
 
         #print("target speed: {}".format(self.state.target_speed))
         if self.state.current_gear == Gear.DRIVE.value and self.state.target_speed <= self.state.steady_speed:
@@ -193,17 +187,15 @@ class CanbusArbiter(Node):
                 (self.state.current_gear == Gear.DRIVE.value or \
                 self.state.current_gear == Gear.REVERSE.value):
                 if self.state.current_speed >= self.state.steady_speed:
-                    if self.ch is None:
+                    if self.ch is not None:
+                        send_velocity_cmd(self.ch, 0.0, 1)
+                        send_brake_cmd(self.ch, 0)
                         return
-                    send_velocity_cmd(self.ch, 0.0, 1)
-                    send_brake_cmd(self.ch, 0)
-                    return
                 elif self.state.current_speed < self.state.steady_speed:
-                    if self.ch is None:
+                    if self.ch is not None:
+                        send_velocity_cmd(self.ch, self.state.min_throttle, 1)
+                        send_brake_cmd(self.ch, 0)
                         return
-                    send_velocity_cmd(self.ch, self.state.min_throttle, 1)
-                    send_brake_cmd(self.ch, 0)
-                # self.state.current_throttle += self.state.throttle_delta # for offline debugging
 
     # Send CAN commands and publish ROS messages according to the current state.
     def timer_callback(self) -> None:
@@ -266,9 +258,8 @@ class CanbusArbiter(Node):
         # FIXME: target gear should be given from upper control
         if not abs_equal(self.state.target_speed, 0.0):
             target_gear = Gear.DRIVE.value
-            if self.ch is None:
-                return
-            send_brake_cmd(self.ch, 0) # FIXME: second speed up cannot work without this
+            if self.ch is not None:
+                send_brake_cmd(self.ch, 0) # FIXME: second speed up cannot work without this
 
         # if self.state.current_mode == GateMode.AUTO:
         #    # self.get_logger().info('change gear failed: AUTO mode is not listening gear commands')
