@@ -45,6 +45,8 @@ class State:
     brake_diag_code:                     bool = False
     # TODO: more diagnostic fields
 
+    steady_speed: float = 11.0          # default: 11 kmph in CAN bus read
+                                        # note that the value read in car dashboard is larger than 3, in this case is 14 kmph
     max_steering_angle: float = 550     # default: 550 degrees
     max_speed: float = 20.0             # default: 20  km/h
     #max_accel: float = 1.0             # default: 1.0 m/s^2

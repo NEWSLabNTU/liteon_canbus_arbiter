@@ -158,7 +158,7 @@ class CanbusArbiter(Node):
                 #self.state.current_gear = self.gearchar_2_val(gear) # for offline debuging
 
         #print("target speed: {}".format(self.state.target_speed))
-        if self.state.current_gear == Gear.DRIVE.value and self.state.target_speed <= 11.0:
+        if self.state.current_gear == Gear.DRIVE.value and self.state.target_speed <= self.state.steady_speed:
             return
 
         if self.state.previous_target_speed == self.state.target_speed:
@@ -168,20 +168,15 @@ class CanbusArbiter(Node):
         if self.state.target_speed != 0 and \
                 (self.state.current_gear == Gear.DRIVE.value or \
                 self.state.current_gear == Gear.REVERSE.value):
-                if self.state.current_speed >= 11.0:
+                if self.state.current_speed >= self.state.steady_speed:
                     if self.ch is None:
                         return
-                    #print(">=11.0")
                     send_velocity_cmd(self.ch, 0.0, 1)
                     send_brake_cmd(self.ch, 0)
                     return
-                elif self.state.current_speed < 11.0:
+                elif self.state.current_speed < self.state.steady_speed:
                     if self.ch is None:
                         return
-                    #print("-------------")
-                    #print("current_speed: ", str(self.state.current_speed))
-                    #print("< 11.0")
-                    #print("-------------")
                     send_velocity_cmd(self.ch, self.state.min_throttle, 1)
                     send_brake_cmd(self.ch, 0)
                 # self.state.current_throttle += self.state.throttle_delta # for offline debugging
