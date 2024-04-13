@@ -1,0 +1,16 @@
+launch:
+
+- node:
+    pkg: "canbus_arbiter"
+    exec: "canbus_arbiter"
+    name: "canbus_arbiter"
+    param:
+    -
+      name: "control"
+      value: "manual"
+    -
+      name: "accel_map"
+      value: "~/autoware/src/universe/autoware.universe/vehicle/raw_vehicle_cmd_converter/data/default/accel_map.csv"
+    -
+      name: "brake_map"
+      value: "~/autoware/src/universe/autoware.universe/vehicle/raw_vehicle_cmd_converter/data/default/brake_map.csv"
