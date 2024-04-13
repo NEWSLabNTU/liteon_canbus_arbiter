@@ -118,14 +118,20 @@ class CanbusArbiter(Node):
             can_callback_period_secs, self.can_callback
         )
 
+
     def step(self) -> None:
         # self.get_logger().info('{}'.format(self.state))
         # simple on-off gear controller
 
         if self.get_parameter('control').get_parameter_value().string_value == "simulate":
-            print("target speed: ", self.state.target_speed)
-            print("target steering angle: ", self.state.target_steering_angle)
-            print("target gear: ", self.state.target_gear)
+            state_value_map = dict()
+            state_value_map['speed'] = self.state.target_speed
+            state_value_map['steering'] = self.state.target_steering_angle
+            state_value_map['gear'] = self.state.target_gear
+            state_value_map['gatemode'] = self.state.target_mode
+
+            for state, value in state_value_map.items():
+                self.get_logger().info("target {}: {}".format(state, value))
 
         # simple on-off mode controller
         if self.state.current_mode != self.state.target_mode:
