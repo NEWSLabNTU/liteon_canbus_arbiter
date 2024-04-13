@@ -5,7 +5,6 @@ import math,time
 from typing import Optional
 import rclpy
 from rclpy.node import Node
-from simple_pid import PID
 
 from .state import State
 from .constant import Gear, CAN_CHANNEL, THROTTLE_STOP_DELTA, FULL_STOP_DELTA, DEFAULT_BRAKE_MAP, DEFAULT_ACCEL_MAP
@@ -119,11 +118,6 @@ class CanbusArbiter(Node):
             can_callback_period_secs, self.can_callback
         )
 
-        # Vehicle controllers, note: need PID tuning
-        #self.speed_controller = PID(0.05, 0, 0)
-        #self.accel_controller = PID(0.05, 0, 0)
-        self.steering_controller = PID(0.7, 0, 0)
-
     def step(self) -> None:
         # self.get_logger().info('{}'.format(self.state))
         # simple on-off gear controller
@@ -143,7 +137,7 @@ class CanbusArbiter(Node):
             # steering_angle = self.steering_controller(self.state.current_steering_angle)
             if self.ch is None:
                 return
-            print("Send angle command")
+            #print("Send angle command")
             send_angle_cmd(self.ch, self.state.target_steering_angle, 1)
             # self.state.current_steering_angle += steering_angle # for offline debuging
 
@@ -158,33 +152,31 @@ class CanbusArbiter(Node):
                 send_gear_cmd(self.ch, gear)
                 #self.state.current_gear = self.gearchar_2_val(gear) # for offline debuging
 
-        print("target speed: {}".format(self.state.target_speed))
+        #print("target speed: {}".format(self.state.target_speed))
         if self.state.current_gear == Gear.DRIVE.value and self.state.target_speed <= 11.0:
             return
 
         if self.state.previous_target_speed == self.state.target_speed:
-            print("same target return")
+            #print("same target return")
             return
 
-        # FIXME: use proper PID controller
-        # throttle_delta = self.speed_controller(self.state.current_throttle)
         if self.state.target_speed != 0 and \
                 (self.state.current_gear == Gear.DRIVE.value or \
                 self.state.current_gear == Gear.REVERSE.value):
                 if self.state.current_speed >= 11.0:
                     if self.ch is None:
                         return
-                    print(">=11.0")
+                    #print(">=11.0")
                     send_velocity_cmd(self.ch, 0.0, 1)
                     send_brake_cmd(self.ch, 0)
                     return
                 elif self.state.current_speed < 11.0:
                     if self.ch is None:
                         return
-                    print("-------------")
-                    print("current_speed: ", str(self.state.current_speed))
-                    print("< 11.0")
-                    print("-------------")
+                    #print("-------------")
+                    #print("current_speed: ", str(self.state.current_speed))
+                    #print("< 11.0")
+                    #print("-------------")
                     send_velocity_cmd(self.ch, self.state.min_throttle, 1)
                     send_brake_cmd(self.ch, 0)
                 # self.state.current_throttle += self.state.throttle_delta # for offline debugging
@@ -223,7 +215,7 @@ class CanbusArbiter(Node):
         return target_steering_angle
 
     def convert_to_target_speed(self, target_speed: float) -> float:
-        # target_speed = clamp(target_speed, self.state.max_speed)
+        target_speed = clamp(target_speed, self.state.max_speed)
         return target_speed
 
     def convert_to_target_accel(self, target_accel):
@@ -238,8 +230,6 @@ class CanbusArbiter(Node):
         if abs(self.state.target_speed) < FULL_STOP_DELTA:
             return 0.0
         target_throttle = clamp(target_throttle, self.state.max_throttle)
-        # TODO: calculate the correct target_throttle (wait for the result of experiment from NYCU)
-        # Note: return value should be percentage [0, 100]
         return target_throttle
 
     # TODO: Process received control request from ROS/Autoware
@@ -253,14 +243,8 @@ class CanbusArbiter(Node):
         # print(lateral)
         # print(longitudinal)
 
-        # PID speed controller
         self.state.previous_target_speed = self.state.target_speed
         self.state.target_speed = self.convert_to_target_speed(longitudinal.speed)
-
-        #if self.state.target_speed != 0.0:
-        #    self.speed_controller.setpoint = 35.0
-        #else:
-        #    self.speed_controller.setpoint = self.state.target_speed
 
         self.state.target_steering_angle = self.convert_to_target_steering_angle(
             self.rad_2_deg(lateral.steering_tire_angle)
@@ -275,7 +259,7 @@ class CanbusArbiter(Node):
             target_gear = Gear.DRIVE.value
             if self.ch is None:
                 return
-            send_brake_cmd(self.ch, 0) # FIXME: second speed up cannot work
+            send_brake_cmd(self.ch, 0) # FIXME: second speed up cannot work without this
 
         # if self.state.current_mode == GateMode.AUTO:
         #    # self.get_logger().info('change gear failed: AUTO mode is not listening gear commands')
@@ -530,7 +514,7 @@ def main():
     except KeyboardInterrupt:
         print("Manually terminated.")
     finally:
-        if self.ch is None:
+        if node.ch is None:
             return
         send_gear_cmd(ch=node.ch, gear="P")
         send_angle_cmd(ch=node.ch, angle=0, active=0)

@@ -45,14 +45,9 @@ class State:
     brake_diag_code:                     bool = False
     # TODO: more diagnostic fields
 
-    # max_speed: float = 14              # default: 20  km/h 
-    # min_throttle: float = 200.0          # default: 20  km/h 
-
-    # approximate 7-9%
-    min_throttle: float = 150.0          # default: 20  km/h 
-    max_steering_angle: float = 550    # default: 50  degrees
-    max_speed: float = 100.0             # default: 20  km/h
+    max_steering_angle: float = 550     # default: 550 degrees
+    max_speed: float = 20.0             # default: 20  km/h
     #max_accel: float = 1.0             # default: 1.0 m/s^2
     #max_decel: float = 3.0             # default: 3.0 m/s^2
-    max_throttle: float = 70.0          # default: 7%
+    max_throttle: float = 150.0         # approximate 7 - 9%
     # TODO: more restriction fields
