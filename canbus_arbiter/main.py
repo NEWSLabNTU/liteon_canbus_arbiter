@@ -38,23 +38,26 @@ class CanbusArbiter(Node):
         super().__init__("canbus_arbiter")
         self.declare_parameter("accel_map", DEFAULT_ACCEL_MAP) # see launch file
         self.declare_parameter("brake_map", DEFAULT_BRAKE_MAP) # see launch file
-        self.declare_parameter("control", "manual") # see launch file
+        self.declare_parameter("control", "simulate") # see launch file
 
         self.ackermann_cmd_topic = None
         self.gear_cmd_topic = None
 
         # can bus
-        self.bitrate = canlib.canBITRATE_500K
-        self.bitrateFlags = canlib.canDRIVER_NORMAL
-        self.ch = canlib.openChannel(channel=CAN_CHANNEL)
-        self.ch.setBusOutputControl(self.bitrateFlags)
-        self.ch.setBusParams(self.bitrate)
-        self.ch.busOn()
+        if self.get_parameter('control').get_parameter_value().string_value == "manual":
+            self.bitrate = canlib.canBITRATE_500K
+            self.bitrateFlags = canlib.canDRIVER_NORMAL
+            self.ch = canlib.openChannel(channel=CAN_CHANNEL)
+            self.ch.setBusOutputControl(self.bitrateFlags)
+            self.ch.setBusParams(self.bitrate)
+            self.ch.busOn()
+        else:
+            self.ch = None
 
         if self.get_parameter('control').get_parameter_value().string_value == "manual":
             self.ackermann_cmd_topic = "/external/selected/control_cmd"
             self.gear_cmd_topic = "/external/selected/gear_cmd"
-        else:
+        else: # simulate and auto
             self.ackermann_cmd_topic = "/control/command/control_cmd"
             self.gear_cmd_topic = "/control/command/gear_cmd"
 
@@ -128,6 +131,9 @@ class CanbusArbiter(Node):
         if abs_equal(self.state.target_speed, 0.0) and not abs_equal(self.state.previous_speed, 0.0):
             #print("target speed: ", self.state.target_speed)
             #print("previous speed: ", self.state.previous_speed)
+            if self.ch is None:
+                return
+
             send_brake_cmd(self.ch, 15)
             return
 
@@ -135,6 +141,8 @@ class CanbusArbiter(Node):
         if self.state.current_gear == Gear.DRIVE.value or \
             self.state.current_gear == Gear.REVERSE.value:
             # steering_angle = self.steering_controller(self.state.current_steering_angle)
+            if self.ch is None:
+                return
             print("Send angle command")
             send_angle_cmd(self.ch, self.state.target_steering_angle, 1)
             # self.state.current_steering_angle += steering_angle # for offline debuging
@@ -145,6 +153,8 @@ class CanbusArbiter(Node):
             if gear is None:
                 self.get_logger().warning("change gear failed: invalid gear")
             else:
+                if self.ch is None:
+                    return
                 send_gear_cmd(self.ch, gear)
                 #self.state.current_gear = self.gearchar_2_val(gear) # for offline debuging
 
@@ -162,11 +172,15 @@ class CanbusArbiter(Node):
                 (self.state.current_gear == Gear.DRIVE.value or \
                 self.state.current_gear == Gear.REVERSE.value):
                 if self.state.current_speed >= 11.0:
+                    if self.ch is None:
+                        return
                     print(">=11.0")
                     send_velocity_cmd(self.ch, 0.0, 1)
                     send_brake_cmd(self.ch, 0)
                     return
                 elif self.state.current_speed < 11.0:
+                    if self.ch is None:
+                        return
                     print("-------------")
                     print("current_speed: ", str(self.state.current_speed))
                     print("< 11.0")
@@ -259,6 +273,8 @@ class CanbusArbiter(Node):
         # FIXME: target gear should be given from upper control
         if not abs_equal(self.state.target_speed, 0.0):
             target_gear = Gear.DRIVE.value
+            if self.ch is None:
+                return
             send_brake_cmd(self.ch, 0) # FIXME: second speed up cannot work
 
         # if self.state.current_mode == GateMode.AUTO:
@@ -514,6 +530,8 @@ def main():
     except KeyboardInterrupt:
         print("Manually terminated.")
     finally:
+        if self.ch is None:
+            return
         send_gear_cmd(ch=node.ch, gear="P")
         send_angle_cmd(ch=node.ch, angle=0, active=0)
         send_velocity_cmd(ch=node.ch, velocity=0, active=0)

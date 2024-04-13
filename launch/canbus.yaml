@@ -7,7 +7,7 @@ launch:
     param:
     -
       name: "control"
-      value: "manual"
+      value: "simulate"
     -
       name: "accel_map"
       value: "~/autoware/src/universe/autoware.universe/vehicle/raw_vehicle_cmd_converter/data/default/accel_map.csv"
