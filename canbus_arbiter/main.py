@@ -99,21 +99,21 @@ class CanbusArbiter(Node):
         # Create publishers
         self.speed_pub = self.create_publisher(
             VelocityReport,
-            # "/vehicle/status/velocity_status", Autoware topic
-            "velocity_status",
-            10,
+            "/vehicle/status/velocity_status", #Autoware topic
+            #"velocity_status",
+            1,
         )
         self.gear_pub = self.create_publisher(
             GearReport,
-            # "/vehicle/status/gear_status", Autoware topic
-            "gear_status",
-            10,
+            "/vehicle/status/gear_status", #Autoware topic
+            #"gear_status",
+            1,
         )
         self.steering_pub = self.create_publisher(
             SteeringReport,
-            # "/vehicle/status/steering_status", Autoware topic
-            "steering_status",
-            10,
+            "/vehicle/status/steering_status", #Autoware topic
+            #"steering_status",
+            1,
         )
 
         # Create a periodic task
@@ -511,6 +511,18 @@ class CanbusArbiter(Node):
             return None
 
     def vehicle_status_report(self) -> None:
+        # for simulation debugging
+        if self.get_parameter("control").get_parameter_value().string_value == "simulate":
+            state_value_map = dict()
+            state_value_map["speed"] = self.state.current_speed
+            state_value_map["steering"] = self.state.current_steering_angle
+            state_value_map["gear"] = self.state.current_gear
+            state_value_map["gatemode"] = self.state.current_mode
+
+            self.get_logger().info("********************")
+            for state, value in state_value_map.items():
+                self.get_logger().info("current {}: {}".format(state, value))
+
         gear_report = GearReport()
         gear_report.stamp = self.get_clock().now().to_msg()
         gear_report.report = self.state.current_gear
