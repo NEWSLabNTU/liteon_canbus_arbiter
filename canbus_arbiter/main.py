@@ -130,6 +130,7 @@ class CanbusArbiter(Node):
             state_value_map['gear'] = self.state.target_gear
             state_value_map['gatemode'] = self.state.target_mode
 
+            self.get_logger().info("--------------------------")
             for state, value in state_value_map.items():
                 self.get_logger().info("target {}: {}".format(state, value))
 
@@ -258,7 +259,6 @@ class CanbusArbiter(Node):
         self.state.target_steering_angle = self.convert_to_target_steering_angle(
             self.rad_2_deg(lateral.steering_tire_angle)
         )
-        self.steering_controller.setpoint = self.state.target_steering_angle
 
     def gear_control_cmd_callback(self, msg: GearCommand) -> None:
         target_gear = int(msg.command)  # it is a num string before casting
