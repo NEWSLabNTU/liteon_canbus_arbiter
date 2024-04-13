@@ -122,6 +122,11 @@ class CanbusArbiter(Node):
         # self.get_logger().info('{}'.format(self.state))
         # simple on-off gear controller
 
+        if self.get_parameter('control').get_parameter_value().string_value == "simulate":
+            print("target speed: ", self.state.target_speed)
+            print("target steering angle: ", self.state.target_steering_angle)
+            print("target gear: ", self.state.target_gear)
+
         if abs_equal(self.state.target_speed, 0.0) and not abs_equal(self.state.previous_speed, 0.0):
             #print("target speed: ", self.state.target_speed)
             #print("previous speed: ", self.state.previous_speed)
