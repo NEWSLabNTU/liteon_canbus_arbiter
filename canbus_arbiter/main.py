@@ -127,6 +127,23 @@ class CanbusArbiter(Node):
             print("target steering angle: ", self.state.target_steering_angle)
             print("target gear: ", self.state.target_gear)
 
+        # simple on-off mode controller
+        if self.state.current_mode != self.state.target_mode:
+            # Note: Brake and gear changes must be done manually; only EPS and throttle can be changed via CAN message.
+            if self.ch is None:
+                return
+
+            if self.state.target_mode == GateMode.EXTERNAL:
+                self.state.current_mode = GateMode.EXTERNAL
+                send_angle_cmd(self.ch, self.state.current_steering_angle, 1)
+                send_velocity_cmd(self.ch, self.state.current_throttle, 1)
+                send_brake_cmd(self.ch, 0)
+            else:
+                self.state.current_mode = GateMode.AUTO
+                send_angle_cmd(self.ch, self.state.current_steering_angle, 0)
+                send_velocity_cmd(self.ch, self.state.current_throttle, 0)
+                send_brake_cmd(self.ch, 0)
+
         if abs_equal(self.state.target_speed, 0.0) and not abs_equal(self.state.previous_speed, 0.0):
             #print("target speed: ", self.state.target_speed)
             #print("previous speed: ", self.state.previous_speed)
@@ -180,20 +197,6 @@ class CanbusArbiter(Node):
                     send_velocity_cmd(self.ch, self.state.min_throttle, 1)
                     send_brake_cmd(self.ch, 0)
                 # self.state.current_throttle += self.state.throttle_delta # for offline debugging
-
-        # simple on-off mode controller
-        if self.state.current_mode != self.state.target_mode:
-            # Note: Brake and gear changes must be done manually; only EPS and throttle can be changed via CAN message.
-            if self.state.target_mode == GateMode.EXTERNAL:
-                self.state.current_mode = GateMode.EXTERNAL
-                # FIXME: uncomment send_angle_cmd(CAN_CHANNEL, self.state.current_steering_angle, 1)
-                # FIXME: uncomment send_velocity_cmd(CAN_CHANNEL, self.state.current_throttle, 1)
-                pass
-            else:
-                self.state.current_mode = GateMode.AUTO
-                # FIXME: uncomment send_angle_cmd(CAN_CHANNEL, self.state.current_steering_angle, 0)
-                # FIXME: uncomment send_velocity_cmd(CAN_CHANNEL, self.state.current_throttle, 0)
-                pass
 
     # Send CAN commands and publish ROS messages according to the current state.
     def timer_callback(self) -> None:
