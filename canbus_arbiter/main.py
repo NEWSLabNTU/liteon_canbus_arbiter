@@ -119,7 +119,7 @@ class CanbusArbiter(Node):
         # IMU data
         self.imu_pub = self.create_publisher(
             Imu,
-            "/sensing/imu/imu_data", # Autoware topic
+            "/canbus_arbiter/imu_data",
             1,
         )
 
