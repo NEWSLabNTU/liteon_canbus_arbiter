@@ -31,6 +31,7 @@ from .velocity import (
 )
 from .wheel import send_angle_message as send_angle_cmd, get_wheeling_angle
 
+from sensor_msgs.msg import Imu
 from tier4_control_msgs.msg import GateMode
 from autoware_auto_control_msgs.msg import AckermannControlCommand
 from autoware_auto_vehicle_msgs.msg import GearCommand
@@ -113,6 +114,12 @@ class CanbusArbiter(Node):
             SteeringReport,
             "/vehicle/status/steering_status", #Autoware topic
             #"steering_status",
+            1,
+        )
+        # IMU data
+        self.imu_pub = self.create_publisher(
+            Imu,
+            "/sensing/imu/imu_data", # Autoware topic
             1,
         )
 
@@ -522,6 +529,15 @@ class CanbusArbiter(Node):
             self.get_logger().info("********************")
             for state, value in state_value_map.items():
                 self.get_logger().info("current {}: {}".format(state, value))
+
+        imu_data = Imu()
+        imu_data.header.stamp = self.get_clock().now().to_msg()
+        imu_data.header.frame_id = 'base_link'
+        imu_data.orientation.x = 3.846374240666872e-05
+        imu_data.orientation.y = -0.0052313517736529815
+        imu_data.orientation.z = 0.00735224433430032
+        imu_data.orientation.w = 0.9999592871624372
+        self.imu_pub.publish(imu_data)
 
         gear_report = GearReport()
         gear_report.stamp = self.get_clock().now().to_msg()
