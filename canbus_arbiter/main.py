@@ -31,7 +31,6 @@ from .velocity import (
 )
 from .wheel import send_angle_message as send_angle_cmd, get_wheeling_angle
 
-from sensor_msgs.msg import Imu
 from tier4_control_msgs.msg import GateMode
 from autoware_auto_control_msgs.msg import AckermannControlCommand
 from autoware_auto_vehicle_msgs.msg import GearCommand
@@ -51,8 +50,24 @@ class CanbusArbiter(Node):
         self.ackermann_cmd_topic = None
         self.gear_cmd_topic = None
 
+        if (
+            self.get_parameter("control").get_parameter_value().string_value != "manual"
+            or self.get_parameter("control").get_parameter_value().string_value
+            != "auto"
+            or self.get_parameter("control").get_parameter_value().string_value
+            != "simulate"
+        ):
+            self.get_logger().info(
+                "Invalid control mode. Valid control mode are: manual or auto or simulate"
+            )
+            return
+
         # can bus
-        if self.get_parameter("control").get_parameter_value().string_value == "manual":
+        if (
+            self.get_parameter("control").get_parameter_value().string_value == "manual"
+            or self.get_parameter("control").get_parameter_value().string_value
+            == "auto"
+        ):
             self.bitrate = canlib.canBITRATE_500K
             self.bitrateFlags = canlib.canDRIVER_NORMAL
             self.ch = canlib.openChannel(channel=CAN_CHANNEL)
@@ -62,10 +77,20 @@ class CanbusArbiter(Node):
         else:
             self.ch = None
 
-        if self.get_parameter("control").get_parameter_value().string_value == "manual":
+        if (
+            self.get_parameter("control").get_parameter_value().string_value == "manual"
+        ):  # for keyboard control
             self.ackermann_cmd_topic = "/external/selected/control_cmd"
             self.gear_cmd_topic = "/external/selected/gear_cmd"
-        else:  # simulate and auto
+        elif (
+            self.get_parameter("control").get_parameter_value().string_value == "auto"
+        ):  # for taxi service
+            self.ackermann_cmd_topic = "/canbus_arbiter/control/command/control_cmd"
+            self.gear_cmd_topic = "/canbus_arbiter/control/command/gear_cmd"
+        elif (
+            self.get_parameter("control").get_parameter_value().string_value
+            == "simulate"
+        ):  # Autoware simulation
             self.ackermann_cmd_topic = "/control/command/control_cmd"
             self.gear_cmd_topic = "/control/command/gear_cmd"
 
@@ -100,26 +125,20 @@ class CanbusArbiter(Node):
         # Create publishers
         self.speed_pub = self.create_publisher(
             VelocityReport,
-            "/vehicle/status/velocity_status", #Autoware topic
-            #"velocity_status",
+            "/vehicle/status/velocity_status",  # Autoware topic
+            # "velocity_status",
             1,
         )
         self.gear_pub = self.create_publisher(
             GearReport,
-            "/vehicle/status/gear_status", #Autoware topic
-            #"gear_status",
+            "/vehicle/status/gear_status",  # Autoware topic
+            # "gear_status",
             1,
         )
         self.steering_pub = self.create_publisher(
             SteeringReport,
-            "/vehicle/status/steering_status", #Autoware topic
-            #"steering_status",
-            1,
-        )
-        # IMU data
-        self.imu_pub = self.create_publisher(
-            Imu,
-            "/canbus_arbiter/imu_data",
+            "/vehicle/status/steering_status",  # Autoware topic
+            # "steering_status",
             1,
         )
 
@@ -150,27 +169,27 @@ class CanbusArbiter(Node):
                 self.get_logger().info("target {}: {}".format(state, value))
 
         # simple on-off mode controller
-        if self.state.current_mode != self.state.target_mode:
-            # Note: Brake and gear changes must be done manually; only EPS and throttle can be changed via CAN message.
-            if self.ch is not None:
-                if self.state.target_mode == GateMode.EXTERNAL:
-                    self.state.current_mode = GateMode.EXTERNAL
-                    send_angle_cmd(
-                        self.ch, self.state.current_steering_angle, 0
-                    )  # disable EPS
-                    send_velocity_cmd(
-                        self.ch, self.state.current_throttle, 0
-                    )  # disable throttle
-                    send_brake_cmd(self.ch, 0)
-                else:
-                    self.state.current_mode = GateMode.AUTO
-                    send_angle_cmd(
-                        self.ch, self.state.current_steering_angle, 1
-                    )  # enable EPS
-                    send_velocity_cmd(
-                        self.ch, self.state.current_throttle, 1
-                    )  # enable throttle
-                    send_brake_cmd(self.ch, 0)
+        # if self.state.current_mode != self.state.target_mode:
+        #    # Note: Brake and gear changes must be done manually; only EPS and throttle can be changed via CAN message.
+        #    if self.ch is not None:
+        #        if self.state.target_mode == GateMode.EXTERNAL:
+        #            self.state.current_mode = GateMode.EXTERNAL
+        #            send_angle_cmd(
+        #                self.ch, self.state.current_steering_angle, 0
+        #            )  # disable EPS
+        #            send_velocity_cmd(
+        #                self.ch, self.state.current_throttle, 0
+        #            )  # disable throttle
+        #            send_brake_cmd(self.ch, 0)
+        #        else:
+        #            self.state.current_mode = GateMode.AUTO
+        #            send_angle_cmd(
+        #                self.ch, self.state.current_steering_angle, 1
+        #            )  # enable EPS
+        #            send_velocity_cmd(
+        #                self.ch, self.state.current_throttle, 1
+        #            )  # enable throttle
+        #            send_brake_cmd(self.ch, 0)
 
         # Only AUTO mode starts AUTONOMOUS Driving
         if self.state.current_mode == GateMode.EXTERNAL:
@@ -519,7 +538,10 @@ class CanbusArbiter(Node):
 
     def vehicle_status_report(self) -> None:
         # for simulation debugging
-        if self.get_parameter("control").get_parameter_value().string_value == "simulate":
+        if (
+            self.get_parameter("control").get_parameter_value().string_value
+            == "simulate"
+        ):
             state_value_map = dict()
             state_value_map["speed"] = self.state.current_speed
             state_value_map["steering"] = self.state.current_steering_angle
@@ -529,15 +551,6 @@ class CanbusArbiter(Node):
             self.get_logger().info("********************")
             for state, value in state_value_map.items():
                 self.get_logger().info("current {}: {}".format(state, value))
-
-        imu_data = Imu()
-        imu_data.header.stamp = self.get_clock().now().to_msg()
-        imu_data.header.frame_id = 'base_link'
-        imu_data.orientation.x = 3.846374240666872e-05
-        imu_data.orientation.y = -0.0052313517736529815
-        imu_data.orientation.z = 0.00735224433430032
-        imu_data.orientation.w = 0.9999592871624372
-        self.imu_pub.publish(imu_data)
 
         gear_report = GearReport()
         gear_report.stamp = self.get_clock().now().to_msg()
